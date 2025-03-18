@@ -51,7 +51,21 @@ boolean_columns = [
 
 cyclist_columns = ["CYCLISTYPE", "CYCACT", "CYCCOND"]
 
-pedestrian_columns = ["CYCLISTYPE", "CYCACT", "CYCCOND"]
+pedestrian_columns = ["PEDTYPE", "PEDACT", "PEDCOND"]
+
+driver_columns = ["MANOEUVER", "DRIVACT", "DRIVCOND"]
+
+driver_columns = ["MANOEUVER", "DRIVACT", "DRIVCOND"]
+
+env_columns = ["ROAD_CLASS", "TRAFFCTL", "VISIBILITY", "LIGHT", "RDSFCOND"]
+
+location_columns = ["LATITUDE", "LONGITUDE"]
+
+direction_columns = ["ACCLOC", "INITDIR"]
+
+injury_columns = ["IMPACTYPE", "INVTYPE", "INVAGE", "INJURY"]
+
+vehicle_columns = ["VEHTYPE"]
 
 
 def describe_data(df: pd.DataFrame) -> None:
@@ -76,6 +90,7 @@ def describe_data(df: pd.DataFrame) -> None:
 
     # printing unique values for each column
     print(f"\nUnique values for DISTRICT: {df["DISTRICT"].unique()}")
+    print(f"\nUnique values for ACCLOC: {df["ACCLOC"].unique()}")
 
     for column in boolean_columns:
         print(f"Unique values for {column}: {df[column].unique()}")
@@ -125,7 +140,6 @@ def visualize_data(df: pd.DataFrame) -> None:
     df_copy = df.copy()
     df_copy.drop(columns_to_drop, axis=1, inplace=True)
 
-    encoder = LabelEncoder()
     df_copy["ACCLASS"] = df_copy["ACCLASS"].apply(lambda x: 1 if x == "Fatal" else 0)
 
     for column in boolean_columns:
@@ -159,8 +173,31 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.title("Mutual information between features and target")
     plt.show()
 
-    stat, p_val = chi2(df_copy[boolean_columns], df_copy["ACCLASS"])
-    p_val = pd.Series(p_val, index=boolean_columns)
+    encoder = LabelEncoder()
+    for column in [
+        *cyclist_columns,
+        *pedestrian_columns,
+        *driver_columns,
+        *env_columns,
+        *direction_columns,
+        *injury_columns,
+        *vehicle_columns,
+    ]:
+        df_copy[column] = encoder.fit_transform(
+            df_copy[column].fillna("Unknown").astype(str)
+        )
+
+    features = df_copy.drop(["ACCLASS", *location_columns], axis=1)
+    mutual_info = mutual_info_classif(features, df_copy["ACCLASS"])
+    mutual_info = pd.Series(mutual_info, index=features.columns)
+    print(mutual_info)
+    mutual_info.sort_values(ascending=False).plot(kind="bar", figsize=(15, 10))
+    plt.title("Mutual information between features and target")
+    plt.show()
+
+    stat, p_val = chi2(features, df_copy["ACCLASS"])
+    p_val = pd.Series(p_val, index=features.columns)
+    print(p_val)
     p_val.sort_values(ascending=True).plot(kind="bar", figsize=(15, 10))
     plt.title("Chi2 test p-values")
     plt.show()
