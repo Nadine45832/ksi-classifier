@@ -102,7 +102,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     :param df: pandas dataframe
     :return: None
     """
-    # histogram for the cancer class
+    # histogram for the accident class to see whether date is imbalanced or not
     plt.figure(figsize=(6, 4))
     plt.hist(
         df["ACCLASS"]
@@ -114,7 +114,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.ylabel("Frequency")
     plt.show()
 
-    # # heat map of correlations coefs for each column
+    # # heat map of correlations coefs for coordinates columns to check whether they are correlated or not
     plt.figure(figsize=(10, 9))
     sns.heatmap(
         df[["LATITUDE", "LONGITUDE", "x", "y"]].corr(),
@@ -125,6 +125,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.title("Feature correlation")
     plt.show()
 
+    # scatter plot of accidents distribution
     sns.scatterplot(
         data=df,
         x="LONGITUDE",
@@ -135,20 +136,32 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.title("Accidents distribution")
     plt.xlabel("Latitude")
     plt.ylabel("Longitude")
+    plt.legend(title="Injury class")
     plt.show()
 
+    # copy dataframe to avoid modifying the original one
     df_copy = df.copy()
     df_copy.drop(columns_to_drop, axis=1, inplace=True)
 
-    df_copy["ACCLASS"] = df_copy["ACCLASS"].apply(lambda x: 1 if x == "Fatal" else 0)
+    # create bar chart to show the number of non-null values per column and to see columns with missing values
+    non_null_values = df_copy.notnull().sum().sort_values(ascending=False)
+    plt.figure(figsize=(10, 9))
+    non_null_values.plot(kind="bar")
+    plt.title("Non-null values per column")
+    plt.xlabel("Features")
+    plt.ylabel("Number of non-null values")
+    plt.show()
 
+    # encode boolean columns
+    df_copy["ACCLASS"] = df_copy["ACCLASS"].apply(lambda x: 1 if x == "Fatal" else 0)
     for column in boolean_columns:
         # encode with apply then We will know what is yes and what is no
         df_copy[column] = df_copy[column].apply(lambda x: 1 if x == "Yes" else 0)
 
+    # heat map of the mutual information matrix between every boolean feature and target to check whether they are correlated or not
     plt.figure(figsize=(10, 9))
     sns.heatmap(
-        df_copy[[*boolean_columns, "ACCLASS"]].corr(),
+        compute_mi_matrix(df_copy[[*boolean_columns, "ACCLASS"]]),
         annot=True,
         cmap="coolwarm",
         fmt=".2f",
@@ -156,7 +169,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.title("Feature correlation")
     plt.show()
 
-    # # combination of histograms of all columns
+    # combination of histograms of all boolean columns
     fig = plt.figure(figsize=(15, 10))
     for index, param in enumerate(boolean_columns):
         plt.subplot2grid((7, 2), (index // 2, index % 2))
@@ -167,12 +180,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     fig.tight_layout(pad=1)
     plt.show()
 
-    mutual_info = mutual_info_classif(df_copy[boolean_columns], df_copy["ACCLASS"])
-    mutual_info = pd.Series(mutual_info, index=boolean_columns)
-    mutual_info.sort_values(ascending=False).plot(kind="bar", figsize=(15, 10))
-    plt.title("Mutual information between features and target")
-    plt.show()
-
+    # encode categorical columns
     encoder = LabelEncoder()
     for column in [
         *cyclist_columns,
@@ -187,70 +195,60 @@ def visualize_data(df: pd.DataFrame) -> None:
             df_copy[column].fillna("Unknown").astype(str)
         )
 
+    # heat map of the mutual information matrix between every feature and target to check whether they are correlated or not
+    plt.figure(figsize=(10, 9))
+    sns.heatmap(
+        compute_mi_matrix(
+            df_copy[
+                [
+                    *cyclist_columns,
+                    *pedestrian_columns,
+                    *driver_columns,
+                    *env_columns,
+                    *direction_columns,
+                    *injury_columns,
+                    *vehicle_columns,
+                ]
+            ]
+        ),
+        annot=True,
+        cmap="coolwarm",
+        fmt=".2f",
+    )
+    plt.title("Feature correlation")
+    plt.show()
+
+    # calculate mutual information and chi2 test p-values for all categorical columns and target column
     features = df_copy.drop(["ACCLASS", *location_columns], axis=1)
     mutual_info = mutual_info_classif(features, df_copy["ACCLASS"])
     mutual_info = pd.Series(mutual_info, index=features.columns)
-    print(mutual_info)
     mutual_info.sort_values(ascending=False).plot(kind="bar", figsize=(15, 10))
     plt.title("Mutual information between features and target")
     plt.show()
 
     stat, p_val = chi2(features, df_copy["ACCLASS"])
     p_val = pd.Series(p_val, index=features.columns)
-    print(p_val)
     p_val.sort_values(ascending=True).plot(kind="bar", figsize=(15, 10))
     plt.title("Chi2 test p-values")
     plt.show()
 
-    # for chunk in columns_chunks:
-    #     df_copy_copy = df_copy[chunk]
 
-    #     df_copy_copy = pd.get_dummies(
-    #         df_copy_copy, drop_first=True, dummy_na=True, dtype=int
-    #     )
-    #     df_copy_copy.fillna(0, inplace=True)
-    #     df_copy_copy["ACCLASS"] = df["ACCLASS"].apply(
-    #         lambda x: 1 if x == "Fatal" else 0
-    #     )
-
-    #     mutual_info = mutual_info_classif(
-    #         df_copy_copy.drop(["ACCLASS"], axis=1), df_copy_copy["ACCLASS"]
-    #     )
-    #     mutual_info = pd.Series(
-    #         mutual_info, index=df_copy_copy.drop(["ACCLASS"], axis=1).columns
-    #     )
-    #     mutual_info.sort_values(ascending=False).plot(kind="bar", figsize=(15, 10))
-    #     plt.title("Mutual information between features and target")
-    #     plt.show()
-
-    # # combination of histograms of all columns
-    # fig = plt.figure(figsize=(15, 10))
-    # for index, param in enumerate(chunk):
-    #     plt.subplot2grid((5, 2), (index // 2, index % 2))
-    #     plt.hist(df[param])
-    #     plt.xlabel(param)
-    #     plt.ylabel("Frequency")
-
-    # fig.tight_layout(pad=1)
-    # plt.show()
-
-    # # dependency between shape and size
-    # plt.scatter(data_nadzeya['shape'], data_nadzeya['size'], alpha=0.1)
-    # plt.title('Correlation between size and shape')
-    # plt.xlabel('Shape')
-    # plt.ylabel('Size')
-    # plt.show()
-
-    # # bar chart of how many shape types per cancer class
-    # crosstab = pd.crosstab(
-    #     data_nadzeya['class'], data_nadzeya['shape']
-    # )
-    # crosstab.plot(kind='bar')
-    # plt.title('Shape distribution')
-    # plt.xlabel('Breast cancer class')
-    # plt.ylabel('Number of patients with particular shape')
-    # plt.grid()
-    # plt.show()
+def compute_mi_matrix(df):
+    """
+    This function computes the mutual information matrix between every feature in the dataframe.
+    :param df: pandas dataframe
+    :return: pandas dataframe
+    """
+    mi_matrix = pd.DataFrame(index=df.columns, columns=df.columns).astype(float)
+    for i in df.columns:
+        for j in df.columns:
+            if i == j:
+                mi_matrix.loc[i, j] = 1.0
+            else:
+                mi_matrix.loc[i, j] = mutual_info_classif(
+                    df[[i]], df[j], discrete_features=True
+                )[0]
+    return mi_matrix
 
 
 def main(file_path):
