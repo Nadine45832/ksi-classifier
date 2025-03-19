@@ -89,8 +89,8 @@ def describe_data(df: pd.DataFrame) -> None:
     print("\nCorrelation matrix:\n", df.select_dtypes(include=["number"]).corr())
 
     # printing unique values for each column
-    print(f"\nUnique values for DISTRICT: {df["DISTRICT"].unique()}")
-    print(f"\nUnique values for ACCLOC: {df["ACCLOC"].unique()}")
+    print(f"\nUnique values for DISTRICT: {df['DISTRICT'].unique()}")
+    print(f"\nUnique values for ACCLOC: {df['ACCLOC'].unique()}")
 
     for column in boolean_columns:
         print(f"Unique values for {column}: {df[column].unique()}")
