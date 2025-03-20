@@ -1,9 +1,18 @@
-from matplotlib import pyplot as plt
 import pandas as pd
 import seaborn as sns
-from sklearn.feature_selection import mutual_info_classif, chi2
-from sklearn.preprocessing import LabelEncoder
-
+from matplotlib import pyplot as plt
+from sklearn.compose import ColumnTransformer
+from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import (
+    LabelEncoder,
+    MinMaxScaler,
+    OneHotEncoder,
+    OrdinalEncoder,
+)
+from imblearn.over_sampling import SMOTENC
 
 columns_to_drop = [
     # this column is not useful for the analysis becuase their values are uqniue
@@ -55,13 +64,20 @@ pedestrian_columns = ["PEDTYPE", "PEDACT", "PEDCOND"]
 
 driver_columns = ["MANOEUVER", "DRIVACT", "DRIVCOND"]
 
-env_columns = ["ROAD_CLASS", "TRAFFCTL", "VISIBILITY", "LIGHT", "RDSFCOND"]
+env_columns = [
+    "ROAD_CLASS",
+    "TRAFFCTL",
+    "VISIBILITY",
+    "LIGHT",
+    "RDSFCOND",
+    "INVTYPE",
+]
 
 location_columns = ["LATITUDE", "LONGITUDE"]
 
 direction_columns = ["ACCLOC", "INITDIR"]
 
-injury_columns = ["IMPACTYPE", "INVTYPE", "INVAGE", "INJURY"]
+injury_columns = ["IMPACTYPE", "INVAGE", "INJURY"]
 
 vehicle_columns = ["VEHTYPE"]
 
@@ -265,11 +281,124 @@ def compute_mi_matrix(df):
     return mi_matrix
 
 
+def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    This function preprocesses the given dataframe.
+    :param df: pandas dataframe
+    :return: pandas dataframe
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    df_processed = df.copy()
+
+    # copy target column
+    # this colum has other values than "Fatal" and "Non-Fatal".
+    # we need to transform it to binary values
+    df_target = df_processed["ACCLASS"].apply(lambda x: 1 if x == "Fatal" else 0)
+
+    # drop columns that are not useful for the analysis
+    df_processed.drop(
+        [*columns_to_drop, "ACCLASS"],
+        axis=1,
+        inplace=True,
+    )
+
+    # split the data into training and testing sets
+    x_train, x_test, y_train, y_test = train_test_split(
+        df_processed,
+        df_target,
+        test_size=0.2,
+        train_size=0.8,
+        random_state=47,
+    )
+
+    # initialize preprocessor
+    preprocesser = ColumnTransformer(
+        transformers=[
+            (
+                "boolean_columns",
+                SimpleImputer(strategy="constant", fill_value="No"),
+                boolean_columns,
+            ),
+            ("coordinares", SimpleImputer(strategy="mean"), location_columns),
+            (
+                "conditions",
+                SimpleImputer(strategy="most_frequent"),
+                [
+                    *env_columns,
+                    *direction_columns,
+                    "IMPACTYPE",
+                    "INVAGE",
+                ],
+            ),
+            (
+                "participant_columns",
+                SimpleImputer(strategy="constant", fill_value="None"),
+                [
+                    *cyclist_columns,
+                    *pedestrian_columns,
+                    *driver_columns,
+                    *vehicle_columns,
+                    "INJURY",
+                ],
+            ),
+        ],
+        remainder="passthrough",
+    )
+
+    categorical_features = [
+        col for col in df_processed.columns.to_list() if col not in location_columns
+    ]
+
+    # encode categorical columns
+    encoder = ColumnTransformer(
+        [
+            (
+                "encoding",
+                OneHotEncoder(sparse_output=False, handle_unknown="ignore"),
+                categorical_features,
+            ),
+        ],
+        remainder="passthrough",
+    )
+
+    # create scaler
+    scaler = ColumnTransformer(
+        [("scale", MinMaxScaler(), location_columns)],
+        remainder="passthrough",
+    )
+
+    # create a pipeline
+    preproccesing_pipeline = Pipeline(
+        steps=[
+            ("preprocessor", preprocesser),
+            ("encoder", encoder),
+            ("scaler", scaler),
+            ("select_features", SelectKBest(chi2, k=20)),
+        ]
+    )
+
+    # fit and transform the training data
+    preproccesing_pipeline.fit(x_train, y_train)
+    x_train = preproccesing_pipeline.transform(x_train)
+
+    # transform the testing data
+    x_test = preproccesing_pipeline.transform(x_test)
+
+    # apply SMOTENC to balance the data
+    smote = SMOTENC(categorical_features=categorical_features, random_state=47)
+
+    # fit resampling
+    x_train, y_train = smote.fit_resample(x_train, y_train)
+
+    return x_train, x_test, y_train, y_test, preproccesing_pipeline
+
+
 def main(file_path):
     df = pd.read_csv(file_path)
 
-    describe_data(df)
-    visualize_data(df)
+    # describe_data(df)
+    # visualize_data(df)
+    x_train, x_test, y_train, y_test, preproccesing_pipeline = data_preprocessing(df)
 
 
 main("TOTAL_KSI_6386614326836635957.csv")
