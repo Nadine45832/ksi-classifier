@@ -13,6 +13,8 @@ from sklearn.preprocessing import (
     OrdinalEncoder,
 )
 from imblearn.over_sampling import SMOTENC
+from collections import Counter
+
 
 columns_to_drop = [
     # this column is not useful for the analysis becuase their values are uqniue
@@ -311,18 +313,54 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
         random_state=47,
     )
 
+    # define pipelines for location columns
+    location_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="mean")),
+            ("scaler", MinMaxScaler()),
+        ]
+    )
+
+    # define pipelines for boolean columns
+    boolean_columns_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="constant", fill_value="No")),
+            ("encoder", OrdinalEncoder()),
+        ]
+    )
+
+    # define pipelines for condition columns
+    condition_columns_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(sparse_output=False, handle_unknown="ignore")),
+        ]
+    )
+
+    # define pipelines for participant columns
+    participant_columns_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="constant", fill_value="None")),
+            ("encoder", OneHotEncoder(sparse_output=False, handle_unknown="ignore")),
+        ]
+    )
+
     # initialize preprocessor
     preprocesser = ColumnTransformer(
         transformers=[
             (
                 "boolean_columns",
-                SimpleImputer(strategy="constant", fill_value="No"),
+                boolean_columns_pipeline,
                 boolean_columns,
             ),
-            ("coordinares", SimpleImputer(strategy="mean"), location_columns),
+            (
+                "coordinates_pipeline",
+                location_pipeline,
+                location_columns,
+            ),
             (
                 "conditions",
-                SimpleImputer(strategy="most_frequent"),
+                condition_columns_pipeline,
                 [
                     *env_columns,
                     *direction_columns,
@@ -332,7 +370,7 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
             ),
             (
                 "participant_columns",
-                SimpleImputer(strategy="constant", fill_value="None"),
+                participant_columns_pipeline,
                 [
                     *cyclist_columns,
                     *pedestrian_columns,
@@ -342,53 +380,43 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
                 ],
             ),
         ],
-        remainder="passthrough",
-    )
-
-    categorical_features = [
-        col for col in df_processed.columns.to_list() if col not in location_columns
-    ]
-
-    # encode categorical columns
-    encoder = ColumnTransformer(
-        [
-            (
-                "encoding",
-                OneHotEncoder(sparse_output=False, handle_unknown="ignore"),
-                categorical_features,
-            ),
-        ],
-        remainder="passthrough",
-    )
-
-    # create scaler
-    scaler = ColumnTransformer(
-        [("scale", MinMaxScaler(), location_columns)],
-        remainder="passthrough",
+        remainder="drop",
     )
 
     # create a pipeline
     preproccesing_pipeline = Pipeline(
         steps=[
             ("preprocessor", preprocesser),
-            ("encoder", encoder),
-            ("scaler", scaler),
-            ("select_features", SelectKBest(chi2, k=20)),
+            # ("select_features", SelectKBest(chi2, k=20)),
         ]
     )
 
     # fit and transform the training data
-    preproccesing_pipeline.fit(x_train, y_train)
-    x_train = preproccesing_pipeline.transform(x_train)
+    x_train = preproccesing_pipeline.fit_transform(x_train, y_train)
 
     # transform the testing data
     x_test = preproccesing_pipeline.transform(x_test)
 
+    # convert x_train to dataframe to use feature names
+    feature_names = preproccesing_pipeline.named_steps[
+        "preprocessor"
+    ].get_feature_names_out()
+    x_train = pd.DataFrame(x_train, columns=feature_names)
+
+    # get the categorical features columns names
+    categorical_features = [
+        col for col in feature_names if col.split("__")[-1] not in location_columns
+    ]
+
     # apply SMOTENC to balance the data
     smote = SMOTENC(categorical_features=categorical_features, random_state=47)
 
+    print(f"Original dataset samples per class {Counter(y_train)}")
+
     # fit resampling
     x_train, y_train = smote.fit_resample(x_train, y_train)
+
+    print(f"Resampled dataset samples per class {Counter(y_train)}")
 
     return x_train, x_test, y_train, y_test, preproccesing_pipeline
 
@@ -396,8 +424,8 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
 def main(file_path):
     df = pd.read_csv(file_path)
 
-    # describe_data(df)
-    # visualize_data(df)
+    describe_data(df)
+    visualize_data(df)
     x_train, x_test, y_train, y_test, preproccesing_pipeline = data_preprocessing(df)
 
 
