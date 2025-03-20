@@ -55,8 +55,6 @@ pedestrian_columns = ["PEDTYPE", "PEDACT", "PEDCOND"]
 
 driver_columns = ["MANOEUVER", "DRIVACT", "DRIVCOND"]
 
-driver_columns = ["MANOEUVER", "DRIVACT", "DRIVCOND"]
-
 env_columns = ["ROAD_CLASS", "TRAFFCTL", "VISIBILITY", "LIGHT", "RDSFCOND"]
 
 location_columns = ["LATITUDE", "LONGITUDE"]
@@ -74,8 +72,10 @@ def describe_data(df: pd.DataFrame) -> None:
     :param df: pandas dataframe
     :return: None
     """
-    print("Dataframe shape: ", df.shape)
-    print("Column names: \n", df.columns.tolist())
+    print("First 5 rows:\n", df.head(5))
+
+    print("\nDataframe shape: ", df.shape)
+    print("Column names: \n", df.columns)
     print("\nColumn types:\n", df.dtypes)
 
     print("\nMissing values:\n", df.isnull().sum(axis=0))
@@ -180,9 +180,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     fig.tight_layout(pad=1)
     plt.show()
 
-    # encode categorical columns
-    encoder = LabelEncoder()
-    for column in [
+    categorical_columns = [
         *cyclist_columns,
         *pedestrian_columns,
         *driver_columns,
@@ -190,7 +188,24 @@ def visualize_data(df: pd.DataFrame) -> None:
         *direction_columns,
         *injury_columns,
         *vehicle_columns,
-    ]:
+    ]
+
+    fig = plt.figure(figsize=(15, 10))
+    for index, param in enumerate(
+        [*injury_columns, *direction_columns, *vehicle_columns]
+    ):
+        plt.subplot2grid((4, 2), (index // 2, index % 2))
+        plt.hist(df[param].fillna("Unknown"))
+        plt.xlabel(param)
+        plt.xticks(rotation=45)
+        plt.ylabel("Frequency")
+
+    fig.tight_layout(pad=1)
+    plt.show()
+
+    # encode categorical columns
+    encoder = LabelEncoder()
+    for column in categorical_columns:
         df_copy[column] = encoder.fit_transform(
             df_copy[column].fillna("Unknown").astype(str)
         )
@@ -198,24 +213,23 @@ def visualize_data(df: pd.DataFrame) -> None:
     # heat map of the mutual information matrix between every feature and target to check whether they are correlated or not
     plt.figure(figsize=(10, 9))
     sns.heatmap(
-        compute_mi_matrix(
-            df_copy[
-                [
-                    *cyclist_columns,
-                    *pedestrian_columns,
-                    *driver_columns,
-                    *env_columns,
-                    *direction_columns,
-                    *injury_columns,
-                    *vehicle_columns,
-                ]
-            ]
-        ),
+        compute_mi_matrix(df_copy[categorical_columns]),
         annot=True,
         cmap="coolwarm",
         fmt=".2f",
     )
     plt.title("Feature correlation")
+    plt.show()
+
+    # calculate mutual information for pedestrian columns
+    plt.figure(figsize=(10, 9))
+    sns.heatmap(
+        compute_mi_matrix(df_copy[[*pedestrian_columns, "PEDESTRIAN"]]),
+        annot=True,
+        cmap="coolwarm",
+        fmt=".2f",
+    )
+    plt.title("Pedestrian feature correlation")
     plt.show()
 
     # calculate mutual information and chi2 test p-values for all categorical columns and target column
