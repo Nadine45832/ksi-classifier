@@ -132,7 +132,7 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.ylabel("Frequency")
     plt.show()
 
-    # # heat map of correlations coefs for coordinates columns to check whether they are correlated or not
+    # heat map of correlations coefs for coordinates columns to check whether they are correlated or not
     plt.figure(figsize=(10, 9))
     sns.heatmap(
         df[["LATITUDE", "LONGITUDE", "x", "y"]].corr(),
@@ -169,6 +169,29 @@ def visualize_data(df: pd.DataFrame) -> None:
     plt.xlabel("Features")
     plt.ylabel("Number of non-null values")
     plt.show()
+
+    # columns to create cross tabulation
+    columns_to_crossrab = [
+        "ALCOHOL",
+        "CYCLISTYPE",
+        "CYCACT",
+        "CYCCOND",
+        "TRUCK",
+        "MOTORCYCLE",
+        "DISABILITY",
+    ]
+
+    df_copy["ACCLASS"] = df_copy["ACCLASS"].apply(
+        lambda x: "Fatal" if x == "Fatal" else "Non-Fatal"
+    )
+    # create cross tabulation between feature and target class
+    for column in columns_to_crossrab:
+        crosstab = pd.crosstab(df_copy[column], df_copy["ACCLASS"], dropna=False)
+        crosstab.plot(kind="bar", figsize=(10, 6))
+        plt.title(f"Cross tabulation between {column} and ACCLASS")
+        plt.xlabel(column)
+        plt.ylabel("Frequency")
+        plt.show()
 
     # encode boolean columns
     df_copy["ACCLASS"] = df_copy["ACCLASS"].apply(lambda x: 1 if x == "Fatal" else 0)
@@ -208,6 +231,7 @@ def visualize_data(df: pd.DataFrame) -> None:
         *vehicle_columns,
     ]
 
+    # combination of histograms of some categorical columns the may correlate
     fig = plt.figure(figsize=(15, 10))
     for index, param in enumerate(
         [*injury_columns, *direction_columns, *vehicle_columns]
@@ -297,12 +321,46 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     # we need to transform it to binary values
     df_target = df_processed["ACCLASS"].apply(lambda x: 1 if x == "Fatal" else 0)
 
-    # drop columns that are not useful for the analysis
+    columns_to_drop_based_on_analysys = [
+        # correlate with INVTYPE and too many missing values
+        "VEHTYPE",
+        # too many missing values and too rare conditions for boolean categories
+        "ALCOHOL",
+        "CYCLISTYPE",
+        "CYCACT",
+        "CYCCOND",
+        "TRUCK",
+        "MOTORCYCLE",
+        "DISABILITY",
+        # chi2 test p-value is too high (more then 0.05)
+        "VISIBILITY",
+        "ROAD_CLASS",
+        "PEDCOND",
+        "PASSENGER",
+        "MOTORCYCLE",
+        "REDLIGHT",
+        "INITDIR",
+        "DISABILITY",
+        "CYCCOND",
+        "RDSFCOND",
+        "MANOEUVER",
+        "EMERG_VEH",
+        # has very small mutial information with the target
+        "TRSN_CITY_VEH",
+        # Correlate with PEDTYPE
+        "PEDACT",
+        "PEDCOND",
+    ]
+
+    # drop columns that are not useful for the analysis and target column
     df_processed.drop(
-        [*columns_to_drop, "ACCLASS"],
+        [*columns_to_drop, *columns_to_drop_based_on_analysys, "ACCLASS"],
         axis=1,
+        errors="ignore",
         inplace=True,
     )
+
+    print("Left columns:", df_processed.columns)
 
     # split the data into training and testing sets
     x_train, x_test, y_train, y_test = train_test_split(
@@ -351,7 +409,11 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
             (
                 "boolean_columns",
                 boolean_columns_pipeline,
-                boolean_columns,
+                [
+                    c
+                    for c in boolean_columns
+                    if c not in columns_to_drop_based_on_analysys
+                ],
             ),
             (
                 "coordinates_pipeline",
@@ -362,21 +424,29 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
                 "conditions",
                 condition_columns_pipeline,
                 [
-                    *env_columns,
-                    *direction_columns,
-                    "IMPACTYPE",
-                    "INVAGE",
+                    c
+                    for c in [
+                        *env_columns,
+                        *direction_columns,
+                        "IMPACTYPE",
+                        "INVAGE",
+                    ]
+                    if c not in columns_to_drop_based_on_analysys
                 ],
             ),
             (
                 "participant_columns",
                 participant_columns_pipeline,
                 [
-                    *cyclist_columns,
-                    *pedestrian_columns,
-                    *driver_columns,
-                    *vehicle_columns,
-                    "INJURY",
+                    c
+                    for c in [
+                        *cyclist_columns,
+                        *pedestrian_columns,
+                        *driver_columns,
+                        *vehicle_columns,
+                        "INJURY",
+                    ]
+                    if c not in columns_to_drop_based_on_analysys
                 ],
             ),
         ],
