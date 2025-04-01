@@ -2,9 +2,21 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.compose import ColumnTransformer
-from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import chi2, mutual_info_classif
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    auc,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_curve,
+    accuracy_score,
+)
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
     LabelEncoder,
@@ -14,6 +26,9 @@ from sklearn.preprocessing import (
 )
 from imblearn.over_sampling import SMOTENC
 from collections import Counter
+
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 
 columns_to_drop = [
@@ -372,6 +387,8 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # define pipelines for location columns
+    # to fill missing values with the mean and scale the data
+    # we will use MinMaxScaler because the data is not normally distributed
     location_pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="mean")),
@@ -380,6 +397,8 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # define pipelines for boolean columns
+    # to fill missing values with "No" and encode the data
+    # we will use OrdinalEncoder because the data is yes or no (cgange it to 1 and 0)
     boolean_columns_pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="constant", fill_value="No")),
@@ -388,6 +407,8 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # define pipelines for condition columns
+    # to fill missing values with the most frequent value and encode the data
+    # we will use OneHotEncoder because the data is categorical to create a binary matrix
     condition_columns_pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="most_frequent")),
@@ -396,6 +417,8 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # define pipelines for participant columns
+    # to fill missing values with "None" and encode the data
+    # we will use OneHotEncoder because the data is categorical to create a binary matrix
     participant_columns_pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="constant", fill_value="None")),
@@ -404,6 +427,7 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # initialize preprocessor
+    # we will use ColumnTransformer to apply different preprocessing pipelines to different columns
     preprocesser = ColumnTransformer(
         transformers=[
             (
@@ -457,7 +481,6 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     preproccesing_pipeline = Pipeline(
         steps=[
             ("preprocessor", preprocesser),
-            # ("select_features", SelectKBest(chi2, k=20)),
         ]
     )
 
@@ -483,7 +506,7 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
 
     print(f"Original dataset samples per class {Counter(y_train)}")
 
-    # fit resampling
+    # fit resampling to balance fatal and non-fatal accidents
     x_train, y_train = smote.fit_resample(x_train, y_train)
 
     print(f"Resampled dataset samples per class {Counter(y_train)}")
@@ -491,12 +514,118 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     return x_train, x_test, y_train, y_test, preproccesing_pipeline
 
 
+def fit_models(x_train, x_test, y_train, y_test):
+    # Define models to try
+    models = {
+        "Logistic Regression": LogisticRegression(max_iter=1000, random_state=47),
+        "Decision Tree": DecisionTreeClassifier(random_state=47),
+        "Random Forest": RandomForestClassifier(random_state=47),
+        "SVM": SVC(probability=True, random_state=47),
+        "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
+    }
+
+    # Define hyperparameter grids for each model
+    param_grids = {
+        "Logistic Regression": {
+            "C": [0.01, 0.1, 1.0, 10.0],
+            "penalty": ["l2"],
+            "solver": ["lbfgs", "liblinear"],
+        },
+        "Decision Tree": {
+            "max_depth": [None, 5, 10, 15],
+            "min_samples_split": [2, 5, 10],
+            "criterion": ["gini", "entropy"],
+        },
+        "Random Forest": {
+            "n_estimators": [100, 200],
+            "max_depth": [None, 10, 20],
+            "min_samples_split": [2, 5, 10],
+            "max_features": ["sqrt", "log2"],
+        },
+        "SVM": {
+            "C": [0.1, 1.0, 10.0],
+            "kernel": ["linear", "poly", "rbf", "sigmoid"],
+            "gamma": ["scale", "auto"],
+        },
+        "Neural Network": {
+            "hidden_layer_sizes": [(50,), (100,), (50, 50)],
+            "activation": ["relu", "tanh"],
+            "alpha": [0.0001, 0.001, 0.01],
+        },
+    }
+
+    results = {}
+
+    # Train and evaluate each model
+    for model_name, model in models.items():
+        print(f"\nTraining {model_name}...")
+
+        # Grid search for hyperparameter tuning
+        print(f"Performing hyperparameter tuning with Grid Search...")
+        grid_search = GridSearchCV(
+            model,
+            param_grids[model_name],
+            cv=5,
+            scoring="f1",
+            n_jobs=-1,
+            verbose=0,
+        )
+
+        grid_search.fit(x_train, y_train)
+
+        # Get the best model
+        best_model = grid_search.best_estimator_
+        best_params = grid_search.best_params_
+
+        print(f"Best parameters: {best_params}")
+
+        # Make predictions
+        y_pred = best_model.predict(x_test)
+
+        # Calculate evaluation metrics
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        conf_matrix = confusion_matrix(y_test, y_pred)
+
+        # Calculate ROC curve and AUC
+        y_pred_proba = best_model.predict_proba(x_test)[:, 1]
+        fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+        auc_score = auc(fpr, tpr)
+
+        # Store results
+        results[model_name] = {
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1,
+            "confusion_matrix": conf_matrix,
+            "fpr": fpr,
+            "tpr": tpr,
+            "auc": auc_score,
+            "best_params": best_params,
+        }
+
+        # Print results
+        print(f"Results for {model_name}:")
+        print(f"  Accuracy:  {accuracy:.4f}")
+        print(f"  Precision: {precision:.4f}")
+        print(f"  Recall:    {recall:.4f}")
+        print(f"  F1 Score:  {f1:.4f}")
+        print(f"  AUC:       {auc_score:.4f}")
+        print(f"  Confusion Matrix:")
+        print(f"    {conf_matrix[0]}")
+        print(f"    {conf_matrix[1]}")
+
+
 def main(file_path):
     df = pd.read_csv(file_path)
 
     describe_data(df)
-    visualize_data(df)
+    # visualize_data(df)
     x_train, x_test, y_train, y_test, preproccesing_pipeline = data_preprocessing(df)
+    fit_models(x_train, x_test, y_train, y_test)
 
 
 main("TOTAL_KSI_6386614326836635957.csv")
