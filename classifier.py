@@ -15,7 +15,7 @@ from sklearn.metrics import (
     roc_curve,
     accuracy_score,
 )
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
@@ -517,11 +517,19 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
 def fit_models(x_train, x_test, y_train, y_test):
     # Define models to try
     models = {
-        "Logistic Regression": LogisticRegression(max_iter=1000, random_state=47),
-        "Decision Tree": DecisionTreeClassifier(random_state=47),
-        "Random Forest": RandomForestClassifier(random_state=47),
-        "SVM": SVC(probability=True, random_state=47),
-        "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
+        "Logistic Regression": LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=47
+        ),
+        "Decision Tree": DecisionTreeClassifier(
+            class_weight="balanced", random_state=47
+        ),
+        "Random Forest": RandomForestClassifier(
+            class_weight="balanced", random_state=47
+        ),
+        "SVM": SVC(class_weight="balanced", probability=True, random_state=47),
+        "Neural Network": MLPClassifier(
+            class_weight="balanced", max_iter=1000, random_state=47
+        ),
     }
 
     # Define hyperparameter grids for each model
@@ -562,11 +570,12 @@ def fit_models(x_train, x_test, y_train, y_test):
 
         # Grid search for hyperparameter tuning
         print(f"Performing hyperparameter tuning with Grid Search...")
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=47)
         grid_search = GridSearchCV(
             model,
             param_grids[model_name],
-            cv=5,
-            scoring="f1",
+            cv=skf,
+            scoring="accuracy",
             n_jobs=-1,
             verbose=0,
         )
