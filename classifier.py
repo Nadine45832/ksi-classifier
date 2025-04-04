@@ -1,8 +1,13 @@
+import joblib
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    AdaBoostClassifier,
+    GradientBoostingClassifier,
+)
 from sklearn.feature_selection import chi2, mutual_info_classif
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
@@ -15,7 +20,11 @@ from sklearn.metrics import (
     roc_curve,
     accuracy_score,
 )
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
+from sklearn.model_selection import (
+    RandomizedSearchCV,
+    StratifiedKFold,
+    train_test_split,
+)
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
@@ -527,38 +536,55 @@ def fit_models(x_train, x_test, y_train, y_test):
             class_weight="balanced", random_state=47
         ),
         "SVM": SVC(class_weight="balanced", probability=True, random_state=47),
-        "Neural Network": MLPClassifier(
-            class_weight="balanced", max_iter=1000, random_state=47
+        "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
+        "Ada Boost": AdaBoostClassifier(
+            estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
+            random_state=47,
+        ),
+        "Gradient Boost": GradientBoostingClassifier(
+            random_state=47,
         ),
     }
 
     # Define hyperparameter grids for each model
     param_grids = {
         "Logistic Regression": {
-            "C": [0.01, 0.1, 1.0, 10.0],
+            "C": [0.01, 0.1, 1.0, 1.5, 2.0, 10.0],
             "penalty": ["l2"],
             "solver": ["lbfgs", "liblinear"],
         },
         "Decision Tree": {
-            "max_depth": [None, 5, 10, 15],
-            "min_samples_split": [2, 5, 10],
+            "max_depth": range(10, 100, 2),
+            "min_samples_split": range(2, 10, 2),
             "criterion": ["gini", "entropy"],
         },
         "Random Forest": {
-            "n_estimators": [100, 200],
-            "max_depth": [None, 10, 20],
-            "min_samples_split": [2, 5, 10],
+            "n_estimators": range(100, 1000, 5),
+            "max_depth": range(10, 100, 2),
+            "min_samples_split": range(2, 10, 2),
             "max_features": ["sqrt", "log2"],
         },
         "SVM": {
-            "C": [0.1, 1.0, 10.0],
+            "C": [0.01, 0.1, 1.0, 2.0],
             "kernel": ["linear", "poly", "rbf", "sigmoid"],
             "gamma": ["scale", "auto"],
+            "degree": [2, 3],
         },
         "Neural Network": {
             "hidden_layer_sizes": [(50,), (100,), (50, 50)],
             "activation": ["relu", "tanh"],
             "alpha": [0.0001, 0.001, 0.01],
+        },
+        "Ada Boost": {
+            "n_estimators": range(50, 500, 10),
+            "learning_rate": [0.01, 0.1, 0.5, 1.0],
+            "estimator__max_depth": range(1, 10, 2),
+        },
+        "Gradient Boost": {
+            "n_estimators": range(100, 500, 50),
+            "learning_rate": [0.01, 0.1, 0.5, 1],
+            "max_depth": range(3, 10, 2),
+            "subsample": [0.8, 0.9, 1.0],
         },
     }
 
@@ -571,13 +597,16 @@ def fit_models(x_train, x_test, y_train, y_test):
         # Grid search for hyperparameter tuning
         print(f"Performing hyperparameter tuning with Grid Search...")
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=47)
-        grid_search = GridSearchCV(
+        grid_search = RandomizedSearchCV(
             model,
             param_grids[model_name],
             cv=skf,
+            n_iter=10,
+            refit=True,
+            random_state=47,
             scoring="accuracy",
             n_jobs=-1,
-            verbose=0,
+            verbose=1,
         )
 
         grid_search.fit(x_train, y_train)
@@ -614,6 +643,7 @@ def fit_models(x_train, x_test, y_train, y_test):
             "tpr": tpr,
             "auc": auc_score,
             "best_params": best_params,
+            "model": best_model,
         }
 
         # Print results
@@ -626,6 +656,25 @@ def fit_models(x_train, x_test, y_train, y_test):
         print(f"  Confusion Matrix:")
         print(f"    {conf_matrix[0]}")
         print(f"    {conf_matrix[1]}")
+
+    best_model_name = max(results, key=lambda x: results[x]["accuracy"])
+    print(f"Best model: ", best_model_name)
+
+    # Plot ROC curve
+    plt.figure(figsize=(10, 6))
+    plt.plot(
+        results[best_model_name]["fpr"],
+        results[best_model_name]["tpr"],
+        label=f"{best_model_name} (AUC = {results[best_model_name]['auc']:.4f})",
+    )
+    plt.plot([0, 1], [0, 1], "k--")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curve")
+    plt.legend(loc="lower right")
+    plt.show()
+
+    joblib.dump(results[best_model_name]["model"], "ksi_classifier.pkl")
 
 
 def main(file_path):
