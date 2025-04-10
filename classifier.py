@@ -523,29 +523,28 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     return x_train, x_test, y_train, y_test, preproccesing_pipeline
 
 
-def fit_models(x_train, x_test, y_train, y_test):
-    # Define models to try
+def fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline):
     models = {
-        "Logistic Regression": LogisticRegression(
-            max_iter=1000, class_weight="balanced", random_state=47
-        ),
-        "Decision Tree": DecisionTreeClassifier(
-            class_weight="balanced", random_state=47
-        ),
+         "Logistic Regression": LogisticRegression(
+             max_iter=1000, class_weight="balanced", random_state=47
+         ),
+         "Decision Tree": DecisionTreeClassifier(
+             class_weight="balanced", random_state=47
+         ),
         "Random Forest": RandomForestClassifier(
             class_weight="balanced", random_state=47
         ),
-        "SVM": SVC(
-            class_weight="balanced", probability=True, random_state=47, cache_size=2000
-        ),
-        "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
-        "Ada Boost": AdaBoostClassifier(
-            estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
-            random_state=47,
-        ),
-        "Gradient Boost": GradientBoostingClassifier(
-            random_state=47,
-        ),
+         "SVM": SVC(
+             class_weight="balanced", probability=True, random_state=47, cache_size=2000
+         ),
+         "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
+         "Ada Boost": AdaBoostClassifier(
+             estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
+             random_state=47,
+         ),
+         "Gradient Boost": GradientBoostingClassifier(
+             random_state=47,
+         ),
     }
 
     # Define hyperparameter grids for each model
@@ -680,6 +679,7 @@ def fit_models(x_train, x_test, y_train, y_test):
     plt.show()
 
     joblib.dump(results[best_model_name]["model"], "ksi_classifier.pkl")
+    joblib.dump(preproccesing_pipeline, "pipeline.pkl")
 
 
 def main(file_path):
@@ -688,7 +688,7 @@ def main(file_path):
     describe_data(df)
     # visualize_data(df)
     x_train, x_test, y_train, y_test, preproccesing_pipeline = data_preprocessing(df)
-    fit_models(x_train, x_test, y_train, y_test)
+    fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline)
 
 
 main("TOTAL_KSI_6386614326836635957.csv")

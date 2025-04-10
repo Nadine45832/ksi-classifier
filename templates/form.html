@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fatal Accident Prediction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        input[type="radio"] {
+            margin-right: 5px;
+            margin-top: 10px;
+        }
+
+        input[type="submit"] {
+            margin-top: 25px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+
+            input[type="submit"]:hover {
+                background-color: #0056b3;
+            }
+
+        h3 {
+            text-align: center;
+            color: #333;
+        }
+
+        p {
+            text-align: center;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Predict the Probability of Fatal Accident</h2>
+
+    <form method="POST" action="/predict">
+        <label>Latitude:</label>
+        <input type="text" name="LATITUDE" required><br>
+
+        <label>Longitude:</label>
+        <input type="text" name="LONGITUDE" required><br>
+
+        <label>Accident Location:</label>
+        <select name="ACCLOC">
+            <option value="At Intersection">At Intersection</option>
+            <option value="Intersection Related">Intersection Related</option>
+            <option value="Non Intersection">Non Intersection</option>
+            <option value="Private Driveway">Private Driveway</option>
+            <option value="At/Near Private Drive">At/Near Private Drive</option>
+            <option value="Underpass or Tunnel">Underpass or Tunnel</option>
+            <option value="Overpass or Bridge">Overpass or Bridge</option>
+            <option value="Trail">Trail</option>
+            <option value="Laneway">Laneway</option>
+            <option value="Other">Other</option>
+        </select><br>
+
+        <label>Traffic Control:</label>
+        <select name="TRAFFCTL">
+            <option value="No Control">No Control</option>
+            <option value="Traffic Signal">Traffic Signal</option>
+            <option value="Stop Sign">Stop Sign</option>
+            <option value="Yield">Yield</option>
+            <option value="Pedestrian Crossover">Pedestrian Crossover</option>
+            <option value="Traffic Gate">Traffic Gate</option>
+        </select><br>
+
+        <label>Lighting Condition:</label>
+        <select name="LIGHT">
+            <option value="Daylight">Daylight</option>
+            <option value="Dark">Dark</option>
+            <option value="Dusk">Dusk</option>
+            <option value="Dawn">Dawn</option>
+        </select><br>
+
+        <label>Impact Type:</label>
+        <select name="IMPACTYPE">
+            <option value="Turning Movement">Turning Movement</option>
+            <option value="Rear End">Rear End</option>
+            <option value="Approaching">Approaching</option>
+            <option value="Other">Other</option>
+        </select><br>
+
+        <label>Involved Type:</label>
+        <select name="INVTYPE">
+            <option value="Driver">Driver</option>
+            <option value="Passenger">Passenger</option>
+            <option value="Pedestrian">Pedestrian</option>
+            <option value="Cyclist">Cyclist</option>
+        </select><br>
+
+        <label>Age of Involved:</label>
+        <input type="number" name="INVAGE" required><br>
+
+        <label>Injury:</label>
+        <select name="INJURY">
+            <option value="None">None</option>
+            <option value="Minimal">Minimal</option>
+            <option value="Minor">Minor</option>
+            <option value="Major">Major</option>
+        </select><br>
+
+        <label>Driver Action:</label>
+        <select name="DRIVACT">
+            <option value="Driving Properly">Driving Properly</option>
+            <option value="Fail to Yield">Fail to Yield</option>
+            <option value="Improper Driving">Improper Driving</option>
+            <option value="Lost Control">Lost Control</option>
+            <option value="Speed too Fast">Speed too Fast</option>
+            <option value="Other">Other</option>
+        </select><br>
+
+        <label>Driver Condition:</label>
+        <select name="DRIVCOND">
+            <option value="Normal">Normal</option>
+            <option value="Impaired">Impaired</option>
+            <option value="Fatigued">Fatigued</option>
+            <option value="Other">Other</option>
+        </select><br>
+
+        <label>Pedestrian Type:</label>
+        <select name="PEDTYPE">
+            <option value="Not a Pedestrian">Not a Pedestrian</option>
+            <option value="Adult">Adult</option>
+            <option value="Senior">Senior</option>
+            <option value="Child">Child</option>
+        </select><br>
+
+        <label>Pedestrian Involved?</label>
+        <input type="radio" name="PEDESTRIAN" value="Yes" required>Yes
+        <input type="radio" name="PEDESTRIAN" value="No">No<br>
+
+        <label>Cyclist Involved?</label>
+        <input type="radio" name="CYCLIST" value="Yes" required>Yes
+        <input type="radio" name="CYCLIST" value="No">No<br>
+
+        <label>Automobile Involved?</label>
+        <input type="radio" name="AUTOMOBILE" value="Yes" required>Yes
+        <input type="radio" name="AUTOMOBILE" value="No">No<br>
+
+        <label>Speeding?</label>
+        <input type="radio" name="SPEEDING" value="Yes" required>Yes
+        <input type="radio" name="SPEEDING" value="No">No<br>
+
+        <label>Aggressive Driving?</label>
+        <input type="radio" name="AG_DRIV" value="Yes" required>Yes
+        <input type="radio" name="AG_DRIV" value="No">No<br><br>
+
+        <input type="submit" value="Predict">
+    </form>
+
+    {% if prediction is not none %}
+    <h3>Prediction Result:</h3>
+    <p><strong>Fatal Probability:</strong> {{ probability }}</p>
+    <p><strong>Prediction (0 = Not Fatal, 1 = Fatal):</strong> {{ prediction }}</p>
+    {% endif %}
+</body>
+</html>
