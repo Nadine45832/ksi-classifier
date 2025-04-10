@@ -535,7 +535,9 @@ def fit_models(x_train, x_test, y_train, y_test):
         "Random Forest": RandomForestClassifier(
             class_weight="balanced", random_state=47
         ),
-        "SVM": SVC(class_weight="balanced", probability=True, random_state=47),
+        "SVM": SVC(
+            class_weight="balanced", probability=True, random_state=47, cache_size=2000
+        ),
         "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
         "Ada Boost": AdaBoostClassifier(
             estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
@@ -551,7 +553,7 @@ def fit_models(x_train, x_test, y_train, y_test):
         "Logistic Regression": {
             "C": [0.01, 0.1, 1.0, 1.5, 2.0, 10.0],
             "penalty": ["l2"],
-            "solver": ["lbfgs", "liblinear"],
+            "solver": ["lbfgs", "liblinear", "saga"],
         },
         "Decision Tree": {
             "max_depth": range(10, 100, 2),
@@ -563,6 +565,7 @@ def fit_models(x_train, x_test, y_train, y_test):
             "max_depth": range(10, 100, 2),
             "min_samples_split": range(2, 10, 2),
             "max_features": ["sqrt", "log2"],
+            "criterion": ["gini", "entropy"],
         },
         "SVM": {
             "C": [0.01, 0.1, 1.0, 2.0],
@@ -601,13 +604,15 @@ def fit_models(x_train, x_test, y_train, y_test):
             model,
             param_grids[model_name],
             cv=skf,
-            n_iter=10,
+            n_iter=20,
             refit=True,
             random_state=47,
-            scoring="accuracy",
+            scoring="recall",
             n_jobs=-1,
-            verbose=1,
+            verbose=3,
         )
+        # recall is more important in our case becuase we need to find as many true positive as possible
+        # false positives are acceptable
 
         grid_search.fit(x_train, y_train)
 
