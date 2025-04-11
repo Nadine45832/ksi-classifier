@@ -542,7 +542,7 @@ def fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline):
         ),
         "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
         "Ada Boost": AdaBoostClassifier(
-            estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
+            estimator=DecisionTreeClassifier(class_weight="balanced"),
             random_state=47,
         ),
         "Gradient Boost": GradientBoostingClassifier(
@@ -697,7 +697,7 @@ def main(file_path):
     df = pd.read_csv(file_path)
 
     describe_data(df)
-    # visualize_data(df)
+    visualize_data(df)
     x_train, x_test, y_train, y_test, preproccesing_pipeline = data_preprocessing(df)
     fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline)
 
