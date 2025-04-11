@@ -511,7 +511,10 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     # apply SMOTENC to balance the data
-    smote = SMOTENC(categorical_features=categorical_features, random_state=47)
+    smote = SMOTENC(
+        categorical_features=categorical_features,
+        random_state=47,
+    )
 
     print(f"Original dataset samples per class {Counter(y_train)}")
 
@@ -525,26 +528,26 @@ def data_preprocessing(df: pd.DataFrame) -> pd.DataFrame:
 
 def fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline):
     models = {
-         "Logistic Regression": LogisticRegression(
-             max_iter=1000, class_weight="balanced", random_state=47
-         ),
-         "Decision Tree": DecisionTreeClassifier(
-             class_weight="balanced", random_state=47
-         ),
+        "Logistic Regression": LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=47
+        ),
+        "Decision Tree": DecisionTreeClassifier(
+            class_weight="balanced", random_state=47
+        ),
         "Random Forest": RandomForestClassifier(
             class_weight="balanced", random_state=47
         ),
-         "SVM": SVC(
-             class_weight="balanced", probability=True, random_state=47, cache_size=2000
-         ),
-         "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
-         "Ada Boost": AdaBoostClassifier(
-             estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
-             random_state=47,
-         ),
-         "Gradient Boost": GradientBoostingClassifier(
-             random_state=47,
-         ),
+        "SVM": SVC(
+            class_weight="balanced", probability=True, random_state=47, cache_size=2000
+        ),
+        "Neural Network": MLPClassifier(max_iter=1000, random_state=47),
+        "Ada Boost": AdaBoostClassifier(
+            estimator=DecisionTreeClassifier(class_weight="balanced", max_depth=10),
+            random_state=47,
+        ),
+        "Gradient Boost": GradientBoostingClassifier(
+            random_state=47,
+        ),
     }
 
     # Define hyperparameter grids for each model
@@ -566,12 +569,19 @@ def fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline):
             "max_features": ["sqrt", "log2"],
             "criterion": ["gini", "entropy"],
         },
-        "SVM": {
-            "C": [0.01, 0.1, 1.0, 2.0],
-            "kernel": ["linear", "poly", "rbf", "sigmoid"],
-            "gamma": ["scale", "auto"],
-            "degree": [2, 3],
-        },
+        "SVM": [
+            {
+                "C": [1.0, 2.0],
+                "kernel": ["poly"],
+                "gamma": ["scale", "auto"],
+                "degree": [2, 3],
+            },
+            {
+                "C": [0.1, 1.0, 2.0],
+                "kernel": ["linear", "rbf", "sigmoid"],
+                "gamma": ["scale", "auto"],
+            },
+        ],
         "Neural Network": {
             "hidden_layer_sizes": [(50,), (100,), (50, 50)],
             "activation": ["relu", "tanh"],
@@ -661,22 +671,23 @@ def fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline):
         print(f"    {conf_matrix[0]}")
         print(f"    {conf_matrix[1]}")
 
-    best_model_name = max(results, key=lambda x: results[x]["accuracy"])
-    print(f"Best model: ", best_model_name)
-
     # Plot ROC curve
-    plt.figure(figsize=(10, 6))
-    plt.plot(
-        results[best_model_name]["fpr"],
-        results[best_model_name]["tpr"],
-        label=f"{best_model_name} (AUC = {results[best_model_name]['auc']:.4f})",
-    )
-    plt.plot([0, 1], [0, 1], "k--")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title("ROC Curve")
-    plt.legend(loc="lower right")
-    plt.show()
+    for model in results:
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            results[model]["fpr"],
+            results[model]["tpr"],
+            label=f"{model} (AUC = {results[model]['auc']:.4f})",
+        )
+        plt.plot([0, 1], [0, 1], "k--")
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.title("ROC Curve")
+        plt.legend(loc="lower right")
+        plt.show()
+
+    best_model_name = max(results, key=lambda x: results[x]["recall"])
+    print("Best model: ", best_model_name)
 
     joblib.dump(results[best_model_name]["model"], "ksi_classifier.pkl")
     joblib.dump(preproccesing_pipeline, "pipeline.pkl")
