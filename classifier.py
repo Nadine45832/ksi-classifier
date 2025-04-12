@@ -591,6 +591,7 @@ def fit_models(x_train, x_test, y_train, y_test, preproccesing_pipeline):
             "n_estimators": range(50, 500, 10),
             "learning_rate": [0.01, 0.1, 0.5, 1.0],
             "estimator__max_depth": range(1, 10, 2),
+            "estimator__min_samples_split": range(10, 50, 5),
         },
         "Gradient Boost": {
             "n_estimators": range(100, 500, 50),
